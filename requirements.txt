@@ -60,7 +60,6 @@ pyparsing==2.4.7
 pyrsistent==0.17.3
 python-dateutil==2.8.1
 pytz==2020.5
-pywin32==300
 pywinpty==0.5.7
 pyzmq==22.0.0
 requests==2.25.1
@@ -80,6 +79,5 @@ traitlets==5.0.5
 urllib3==1.26.2
 wcwidth==0.2.5
 webencodings==0.5.1
-xlwings==0.21.4
 yahooquery==2.2.12
 yfinance==0.1.55
