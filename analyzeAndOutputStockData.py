@@ -18,8 +18,11 @@ import math
 
 from stockDataRetrieval import getStockData
 
-import xlwings
+
 import numpy
+import openpyxl
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
 
 from graphingStockCode import graphStockDataAndReturnStockDataUpdatedWithIntersectionData
 
@@ -40,7 +43,7 @@ def getQuarterandYearNameFromQuarterEndDate(d):
 
 
 
-def analyzeAndOutputStockData(stockSymbolList,dateOfInterest):
+def analyzeAndOutputStockData(stockSymbolList,dateOfInterest, userOptions):
     getStockDataOutput = getStockData(stockSymbolList, dateOfInterest)
 
     listOfStockData = getStockDataOutput[0]
@@ -50,7 +53,7 @@ def analyzeAndOutputStockData(stockSymbolList,dateOfInterest):
     graphStockData(ahistory, stock.stockSymbol, stock.desiredDateForStockData)
     '''
 
-    graphPdfFileName, listOfStockData = graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listOfStockData, listOfStockData[0].desiredDateForStockData)#default graph period is 1 year
+    graphPdfFileName, listOfStockData = graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listOfStockData, listOfStockData[0].desiredDateForStockData, userOptions)#default graph period is 1 year
     #print(listOfStockData[0].intersectionData)
 
 
@@ -77,7 +80,7 @@ def analyzeAndOutputStockData(stockSymbolList,dateOfInterest):
 
     ##
     ##COLUMN HEADERS
-    initialColumnTitles = ['March low change(%)', 'Stock', 'Price', 'Change($)', 'Change(%)', 'PE Ratio']
+    initialColumnTitles = ['Max ago change %','10yr(uses 1mo avg) change %','5yr(uses 1mo avg) change %','March low change(%)', 'Stock', 'Price', 'Change($)', 'Change(%)', 'PE Ratio']
     stockDataColumnTitlesForDataFrame = initialColumnTitles.copy()
 
     sortedListOfAllQuarterNames = []
@@ -100,13 +103,13 @@ def analyzeAndOutputStockData(stockSymbolList,dateOfInterest):
     stockDataColumnTitlesForDataFrame.extend(quarterlyDataColumnTitles)
 
     currentTimeAndDate = datetime.now(timezone('US/Eastern'))
-    additionalColumnTitles = ['Stock', 'Financial Data Currency', 'Conversion factors that were used to convert financial data to USD (left to right, latest to oldest quarter)',
+    additionalColumnTitles = ['Stock2', 'Financial Data Currency', 'Conversion factors that were used to convert financial data to USD (left to right, latest to oldest quarter)',
                               currentTimeAndDate.strftime('Latest Market cap (as of %m-%d-%Y)'), currentTimeAndDate.strftime('Latest Volume (as of %m-%d-%Y)'),#these 2 must stay together in this order
                               currentTimeAndDate.strftime('Latest Dividend (as of %m-%d-%Y)'), currentTimeAndDate.strftime('Latest Dividend Yield (as of %m-%d-%Y)'),
                               'last date 50MA up over 200MA', 'last date 50MA down under 200MA',
                               'last date 14MA up over 200MA', 'last date 14MA down under 200MA',
                               'last date price up over 200MA', 'last date price down under 200MA',
-                              ]#these 2 must stay together in this order
+                              ]#these 2 must stay together in this order, Stock2 used because pandas dataframe gets confused with duplicate column names and will duplicate columns
     stockDataColumnTitlesForDataFrame.extend(additionalColumnTitles)
 
 
@@ -119,6 +122,21 @@ def analyzeAndOutputStockData(stockSymbolList,dateOfInterest):
 
         ##
         ##ADDING PRE-QUARTERLY DATA
+
+        if (math.isnan(stock.closePriceMaxAgo) == True):
+            stockDataRowAsList.append('N/A')
+        else:
+            stockDataRowAsList.append((stock.closePrice - stock.closePriceMaxAgo)/stock.closePriceMaxAgo)
+        if (math.isnan(stock.meanPriceForMonthTenYearsAgo) == True):
+            stockDataRowAsList.append('N/A')
+        else:
+            stockDataRowAsList.append((stock.closePrice - stock.meanPriceForMonthTenYearsAgo)/stock.meanPriceForMonthTenYearsAgo)
+        if(math.isnan(stock.meanPriceForMonthFiveYearsAgo) == True):
+            stockDataRowAsList.append('N/A')
+        else:
+            stockDataRowAsList.append((stock.closePrice - stock.meanPriceForMonthFiveYearsAgo)/stock.meanPriceForMonthFiveYearsAgo)
+
+
         if (math.isnan(stock.sortingValue) == True):#if no data from march, write N/A
             stockDataRowAsList.append('N/A')
         else:
@@ -269,95 +287,158 @@ def analyzeAndOutputStockData(stockSymbolList,dateOfInterest):
     newColsOrder.extend(cols_stockData_DataFrameRef[newColsOrderLength:len(additionalColumnTitles)+newColsOrderLength])
 
 
-    stockData_DataFrame = stockData_DataFrame[newColsOrder]
+    stockData_DataFrame = stockData_DataFrame[newColsOrder]#if you have duplicate column names, that column will be duplicated
+
+
+    stockDataExcelFileName = 'No excel file saved'
+    if userOptions['saveExcel']:
+        #save excel file
+        currentTimeAndDate = datetime.now(timezone('US/Eastern'))
+        stockDataExcelFileName = 'stockData_'+dateOfInterest.strftime('%m-%d-%Y___') + currentTimeAndDate.strftime('generated_%m-%d-%Y_%I-%M%p_EST') + '.xlsx'
+        stockData_DataFrame.to_excel(stockDataExcelFileName, index=False)
 
 
 
 
-    #save excel file
-    currentTimeAndDate = datetime.now(timezone('US/Eastern'))
-    stockDataExcelFileName = 'stockData_'+dateOfInterest.strftime('%m-%d-%Y___') + currentTimeAndDate.strftime('generated_%m-%d-%Y_%I-%M%p_EST') + '.xlsx'
-    stockData_DataFrame.to_excel(stockDataExcelFileName, index=False)
+        ##
+        ##FORMAT EXCEL FILE using Openpyxl
 
+        workbook = openpyxl.load_workbook(filename=stockDataExcelFileName)
+        sht1 = workbook['Sheet1']
 
+        #format data columns before quarterly data
+        #sht1.column_dimensions['A'].number_format = '[Color10]+0.00\%;[Red]-0.0#\%'#sorting value, change % from march lows in this case
+        ['Max ago change %', '10yr(uses 1mo avg) change %', '5yr(uses 1mo avg) change %', 'March low change(%)', 'Stock',
+         'Price', 'Change($)', 'Change(%)', 'PE Ratio']
 
+        ##
+        ##Replace this set of code with a function
+        maxAgoChangePercColLetter = get_column_letter(1 + initialColumnTitles.index('Max ago change %'))
+        for col_cell in sht1[maxAgoChangePercColLetter]:
+            col_cell.number_format = '[Color10]+0.00%;[Red]-0.00%'
+        tenYearChangePercColLetter = get_column_letter(1 + initialColumnTitles.index('10yr(uses 1mo avg) change %'))
+        for col_cell in sht1[tenYearChangePercColLetter]:
+            col_cell.number_format = '[Color10]+0.00%;[Red]-0.00%'
+        fiveYearChangePercColLetter = get_column_letter(1 + initialColumnTitles.index('5yr(uses 1mo avg) change %'))
+        for col_cell in sht1[fiveYearChangePercColLetter]:
+            col_cell.number_format = '[Color10]+0.00%;[Red]-0.00%'
 
+        sortingValueColLetter = get_column_letter(1+initialColumnTitles.index('March low change(%)'))
+        for col_cell in sht1[sortingValueColLetter]:
+            col_cell.number_format = '[Color10]+0.00\%;[Red]-0.00\%'#sorting value, change % from march lows in this case
+        priceColLetter = get_column_letter(1 + initialColumnTitles.index('Price'))
+        for col_cell in sht1[priceColLetter]:
+            col_cell.number_format = '$0.00;-$0.00'  # stock price
+        changeDollarColLetter = get_column_letter(1 + initialColumnTitles.index('Change($)'))
+        for col_cell in sht1[changeDollarColLetter]:
+            col_cell.number_format = '[Color10]+$0.00;[Red]-$0.00'  # change in dollars
+        changePercColLetter = get_column_letter(1 + initialColumnTitles.index('Change(%)'))
+        for col_cell in sht1[changePercColLetter]:
+            col_cell.number_format = '[Color10]+0.00\%;[Red]-0.00\%'  # change in %
+        peRatioColLetter = get_column_letter(1 + initialColumnTitles.index('PE Ratio'))
+        for col_cell in sht1[peRatioColLetter]:
+            col_cell.number_format = '0.00;-0.00'  # pe ratio
 
-    ##
-    ##FORMAT EXCEL FILE
-
-    #apply formatting to the excel file
-    #possibly a better way to open the file than this. If I set visible to true, a seperate workbook and new sheet opens up each time
-    excel_app = xlwings.App(visible=False)
-    excel_book = excel_app.books.open(stockDataExcelFileName)
-    sht1 = excel_book.sheets['Sheet1']
-
-    #should be a way to do this without iterating through. Understand range data type better
-    for i in range(len(stockSymbolList)):
-        sht1.cells(i + 2, 'A').number_format = '[Color10]+0.00\%;[Red]-0.0#\%'#sorting value, change % from march lows in this case
-        sht1.cells(i + 2, 'C').number_format = '$0.00;-$0.00'#stock price
-        sht1.cells(i + 2, 'D').number_format = '[Color10]+$0.00;[Red]-$0.00'#change in dollars
-        sht1.cells(i + 2, 'E').number_format = '[Color10]+0.00\%;[Red]-0.00\%'#change in %
-        sht1.cells(i + 2, 'F').number_format = '0.00;-0.00'#pe ratio
-
-        # this formats data if it's in the all 4 Q rev, all 4 Q profit, all 4 Q margin order
+        # this formats quarterly data if it's in the all 4 Q rev, all 4 Q profit, all 4 Q margin order
         numberOfColumnsBeforeQuarterlyData = len(initialColumnTitles)
         for j in range(len(quarterlyDataColumnTitles)):
-            if (j < len(sortedListOfAllQuarterNames)*2):
-                sht1.cells(i + 2, j + 1 + numberOfColumnsBeforeQuarterlyData).number_format = '[Color10]0,00;[Red]-0,00'
+            if (j < len(sortedListOfAllQuarterNames) * 2):
+                for col_cell in sht1[get_column_letter(j + 1 + numberOfColumnsBeforeQuarterlyData)]:
+                    col_cell.number_format = '[Color10]0,00;[Red]-0,00'
 
             else:
-                sht1.cells(i + 2, j + 1 + numberOfColumnsBeforeQuarterlyData).number_format = '[Color10]0.00\%;[Red]-0.00\%'
+                for col_cell in sht1[get_column_letter(j + 1 + numberOfColumnsBeforeQuarterlyData)]:
+                    col_cell.number_format = '[Color10]0.00\%;[Red]-0.00\%'
+
+        # formatting additional data columns
+        numberOfcolumnsBeforeAdditionalData = len(initialColumnTitles)+len(quarterlyDataColumnTitles)
+
+        numberColBeforeMarketCapInAddtlData = additionalColumnTitles.index(currentTimeAndDate.strftime('Latest Market cap (as of %m-%d-%Y)'))
+        marketCapAndVolNumberFormat = '0,00;-0,00'
+        for col_cell in sht1[get_column_letter(1+numberOfcolumnsBeforeAdditionalData+numberColBeforeMarketCapInAddtlData)]:
+            col_cell.number_format = marketCapAndVolNumberFormat
+        for col_cell in sht1[get_column_letter(1+numberOfcolumnsBeforeAdditionalData + numberColBeforeMarketCapInAddtlData+1)]:
+            col_cell.number_format = marketCapAndVolNumberFormat
+
+        numberColBeforeDividendInAddtlData = additionalColumnTitles.index(currentTimeAndDate.strftime('Latest Dividend (as of %m-%d-%Y)'))
+        for col_cell in sht1[get_column_letter(1+numberOfcolumnsBeforeAdditionalData+numberColBeforeDividendInAddtlData)]:
+            col_cell.number_format = '$0.00;-$0.00'#dividend format
+        for col_cell in sht1[get_column_letter(1+numberOfcolumnsBeforeAdditionalData+numberColBeforeDividendInAddtlData+1)]:
+            col_cell.number_format = '0.00%;-0.00%'
+
+
+
+
+
+
+
+        from openpyxl.styles import Font, Border, Side
+        #adding additional stock symbol columns
+        #insert stock symbol columns in quarterly data
+        stockSymbolColNum = 1 + initialColumnTitles.index('Stock')####Note that this will be invalid if I add a stock row before the first row
+
+
+        ####Cannot use col number before first stock column on left side, otherwise will mess data up
+        quarterlyDataNumColToStep = int(len(quarterlyDataColumnTitles)/3)
+        firstRevenueColNum = 1+len(initialColumnTitles)
+        firstNetIncomeColNum = 1 + len(initialColumnTitles) + quarterlyDataNumColToStep + 1##last 1 counts for inserted stock Row
+        firstMarginColNum = 1 + len(initialColumnTitles) + (quarterlyDataNumColToStep*2) + 2#last 2 counts for inserted stock Rows
+        stockColInsertionLocationsAfterFirstStockColOnly_LefttoRight = [firstRevenueColNum,firstNetIncomeColNum,firstMarginColNum]
+
+        for colNum in stockColInsertionLocationsAfterFirstStockColOnly_LefttoRight:
+            sht1.insert_cols(colNum)
+            stockTitleCell = sht1.cell(row=1, column=colNum)
+            stockTitleCell.value = 'Stock'
+            stockTitleCell.font = Font(bold=True)
+            stockTitleCell.border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            for i in range(2, len(stockSymbolList) + 2):
+                sht1.cell(row=i, column=colNum).value = sht1.cell(row=i, column=stockSymbolColNum).value
+
+        numStockColsAdded = len(stockColInsertionLocationsAfterFirstStockColOnly_LefttoRight)
+
+
+
+
+        #set alignment of data
+        for i in range(1, sht1.max_column + 1):#aligning all data
+            for col_cell in sht1[get_column_letter(i)]:
+                col_cell.alignment = Alignment(horizontal='right')
+
+        stockSymbolColLetter = get_column_letter(1 + initialColumnTitles.index('Stock'))
+        for col_cell in sht1[stockSymbolColLetter]:
+            col_cell.alignment = Alignment(horizontal='left')
+
+        numberColBeforeFinCurConvInAddtlData = additionalColumnTitles.index('Conversion factors that were used to convert financial data to USD (left to right, latest to oldest quarter)')
+        for col_cell in sht1[get_column_letter(1+numberOfcolumnsBeforeAdditionalData + numStockColsAdded + numberColBeforeFinCurConvInAddtlData)]:
+            col_cell.alignment = Alignment(horizontal='left')
 
         '''
-        #this formats data if it's in the rev profit margin order triplets for each quarter
-        numberOfColumnsBeforeQuarterlyData = len(stockDataColumnTitlesForDataFrame) - len(quarterlyDataColumnTitles)
-        for j in range(len(quarterlyDataColumnTitles)):
-            if(((j+1)%3) == 0):#every 3rd quarterly data column is margins data, which needs different formatting
-                sht1.cells(i + 2, j + 1 + numberOfColumnsBeforeQuarterlyData).number_format = '[Color10]0.00\%;[Red]-0.00\%'
-            else:
-                sht1.cells(i + 2, j+1+numberOfColumnsBeforeQuarterlyData).number_format = '[Color10]0,00;[Red]-0,00'
+        for i in range(1, sht1.max_column + 1):
+            sht1.cell(row=1, column=i).alignment = Alignment(horizontal='center')
+    
+        # adjusting text wrapping and column width/height
+        for i in range((numberOfcolumnsBeforeAdditionalData + 1), (numberOfcolumnsBeforeAdditionalData + 6)):
+            sht1.cell(row=1, column=i).alignment = Alignment(wrapText=True)
         '''
 
-    #formating additional data, using range method
-    numberOfcolumnsBeforeAdditionalData = len(initialColumnTitles)+len(quarterlyDataColumnTitles)
-
-    numberColBeforeMarketCapInAddtlData = additionalColumnTitles.index(currentTimeAndDate.strftime('Latest Market cap (as of %m-%d-%Y)'))
-    marketCapAndVolRange = sht1[ 1:(len(stockSymbolList)+1),(numberOfcolumnsBeforeAdditionalData+numberColBeforeMarketCapInAddtlData):(numberOfcolumnsBeforeAdditionalData+numberColBeforeMarketCapInAddtlData+2)]
-    marketCapAndVolRange.number_format = '0,00;-0,00'
-
-    numberColBeforeDividendInAddtlData = additionalColumnTitles.index(currentTimeAndDate.strftime('Latest Dividend (as of %m-%d-%Y)'))
-    dividendRange = sht1[1:(len(stockSymbolList)+1),numberOfcolumnsBeforeAdditionalData+numberColBeforeDividendInAddtlData]
-    dividendRange.number_format = '$0.00;-$0.00'
-    dividendYieldRange = sht1[1:(len(stockSymbolList)+1),numberOfcolumnsBeforeAdditionalData+numberColBeforeDividendInAddtlData+1]
-    dividendYieldRange.number_format = '0.00%;-0.00%'#since no \% used, % this converts data to percent out of 100 by multiplying by 100
-
-    #alignment
-    allDataRange = sht1[1:(len(stockSymbolList)+1), 0:len(stockDataColumnTitlesForDataFrame)]
-    allDataRange.api.HorizontalAlignment = -4152  # left aligned: -4131 right aligned: -4152 center aligned: -4108
-    sht1.range('B2:B' + str(len(stockSymbolList)+1)).api.HorizontalAlignment = -4131
-
-    numberColBeforeFinCurConvInAddtlData = additionalColumnTitles.index('Conversion factors that were used to convert financial data to USD (left to right, latest to oldest quarter)')
-    financialCurrencyConversionRange = sht1[1:(len(stockSymbolList)+1),numberOfcolumnsBeforeAdditionalData+numberColBeforeFinCurConvInAddtlData]
-    financialCurrencyConversionRange.api.HorizontalAlignment = -4131
-
-    #wrapping and column width/height
-    wrapTextColumnHeaderRange = sht1[0, numberOfcolumnsBeforeAdditionalData+1:(numberOfcolumnsBeforeAdditionalData+6)]
-    wrapTextColumnHeaderRange.api.WrapText = True
-    sht1.autofit(axis="columns")
-    sht1.autofit(axis="rows")
-
-    #sht1.autofit()
-
-    excel_book.save()
-    excel_book.close()
-    excel_app.quit()
+        #adjusts column width
+        dims = {}
+        for row in sht1.rows:
+            for cell in row:
+                if cell.value:
+                    dims[cell.column_letter] = max((dims.get(cell.column_letter, 0), len(str(cell.value))))
+        for col, value in dims.items():
+            sht1.column_dimensions[col].width = value + 1.23 #1.23 is fudge factor
 
 
 
 
+        workbook.save(filename=stockDataExcelFileName)
 
-    print('\n\n-------\n' + dateOfInterest.strftime('%m-%d-%Y') + ' stock report finished and saved' + '\n-------\n\n\n\n')
+
+        print('\n\n-------\n' + dateOfInterest.strftime('%m-%d-%Y') + ' stock report saved excel file' + '\n-------\n\n\n\n')
+
+    print('\n\n-------\n' + dateOfInterest.strftime('%m-%d-%Y') + ' stock report finished' + '\n-------\n\n\n\n')
 
     return stockDataExcelFileName, graphPdfFileName
 

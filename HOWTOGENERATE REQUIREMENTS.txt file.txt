@@ -1,0 +1,2 @@
+in terminal in pycharm project:
+pip3 freeze > requirements.txt

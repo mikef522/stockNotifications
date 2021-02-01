@@ -58,7 +58,7 @@ def send_mail(send_from, send_to, subject, message, files=[],
     smtp.quit()
 
 
-def emailStockData(stockDataFilesToEmail,emailRecipients, datesForStockDataBeingEmailed):
+def emailStockData(stockDataFilesToEmail,emailRecipients, datesForStockDataBeingEmailed, userOptions):
     '''
     stockDataFilesToEmail (list[str]): list of filenames
     '''
@@ -81,12 +81,12 @@ def emailStockData(stockDataFilesToEmail,emailRecipients, datesForStockDataBeing
 
 
     #send the email (also compose the subject line)
-    send_from = 'stocknotificationsmike@gmail.com'
+    send_from = userOptions['notificationEmailAddress']
     send_to = emailRecipients
 
     subject = ''
     #check if there is only data for one date being emailed. Adjust the subject title accordingly
-    subjectString = 'Automated Stock Notification v8 (now provides graphs with golden crosses). Still double check PE ratios and data'
+    subjectString = 'Automated Stock Notification v10'
     #subjectString = 'Most shorted stocks'
     if (datesForStockDataBeingEmailed[0] == datesForStockDataBeingEmailed[-1]):
         subject = datesForStockDataBeingEmailed[0].strftime('%m-%d-%Y') + ' ' + subjectString
@@ -100,7 +100,7 @@ def emailStockData(stockDataFilesToEmail,emailRecipients, datesForStockDataBeing
         files.append(Path.cwd().joinpath(file))
 
     server = 'smtp.gmail.com'
-    username = 'stocknotificationsmike@gmail.com'
-    password = 'mikef_522'
+    username = userOptions['notificationEmailAddress']
+    password = userOptions['notificationEmailPassword']
 
     send_mail(send_from,send_to,subject,message,files,server=server,username=username,password=password)

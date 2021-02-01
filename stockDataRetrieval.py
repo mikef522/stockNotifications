@@ -1,5 +1,6 @@
 from datetime import datetime
 from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from pytz import timezone
 from yahooquery import Ticker
 import yahooquery
@@ -7,6 +8,7 @@ import pandas as pd
 from forex_python.converter import CurrencyRates
 import forex_python
 currencyConverter = CurrencyRates()
+import statistics
 
 
 
@@ -45,7 +47,29 @@ class StockDataForDay:
 
         self.sortingValue = float('nan')
 
+        self.meanPriceForMonthFiveYearsAgo = float('nan')
+        self.meanPriceForMonthTenYearsAgo = float('nan')
+        self.closePriceMaxAgo = float('nan')
+
         self.intersectionData = None
+
+
+
+def getMeanPriceYearsAgo(yrsAgo,startDate, tickerYahooQueryStock):
+
+    priceExistsNumYearsAgo = True
+    dateNumYearsAgo = startDate - relativedelta(years=yrsAgo)
+    stockHistoryNumYearsAgo = tickerYahooQueryStock.history(start=dateNumYearsAgo - timedelta(days=15), end=dateNumYearsAgo + timedelta(days=16))
+
+    if isinstance(stockHistoryNumYearsAgo, pd.DataFrame):
+        closePricesNumYearsAgo = stockHistoryNumYearsAgo.loc[:, 'close'].to_numpy()
+        meanPriceForMonthNumYearsAgo = statistics.mean(closePricesNumYearsAgo)
+        return meanPriceForMonthNumYearsAgo, priceExistsNumYearsAgo
+    else:
+        stockHistoryMaxAgo = tickerYahooQueryStock.history(period='max', interval='1d')
+        closePriceMaxAgo = stockHistoryMaxAgo.loc[stockHistoryMaxAgo.index[0], 'close']
+        priceExistsNumYearsAgo = False
+        return closePriceMaxAgo, priceExistsNumYearsAgo
 
 
 def getStockData(stockSymbolList, date, listOfAllQuarterDates=[]):#date is kind of irrelevant if I'm limited to analyzing same day summary data
@@ -82,9 +106,15 @@ def getStockData(stockSymbolList, date, listOfAllQuarterDates=[]):#date is kind 
 
         #this is only necessary if not retrieving data on same day, I can just use the summary data. But I don't think I can access past summary data then can I? Problematic if not running program on same day!!
         oneWeekEarlier = date - timedelta(days=7)#can't simply substract a day to find date of last close because stock market is not open every day. Look back a week and hope that's long enough to find another day market was open
-
-        stockHistoryPastWeek = yahooQueryStock.history(start=oneWeekEarlier, end=date+timedelta(days=1))#this isn't safe because if the stocks were closed for more than 1 week,I would miss previous day
-        historyTodayAndPreviousDayOnly = stockHistoryPastWeek.tail(2)
+        nextDay = date+timedelta(days=1)
+        stockHistoryPastWeek = yahooQueryStock.history(start=oneWeekEarlier, end=nextDay)#this isn't safe because if the stocks were closed for more than 1 week,I would miss previous day
+        #not quite sure exactly why I need this next bit (maybe time zone differences?) But 2454.TW data includes date+1 day data for some reason. Notably, time is close to midnight.
+        #checks to see if last day in past week data is date + 1 instead of the expected date, and corrects the data as necessary (throws out the date + 1 data)
+        if (stockHistoryPastWeek.index[-1][1] == nextDay.date()):
+            historyPastThreeDays = stockHistoryPastWeek.tail(3)
+            historyTodayAndPreviousDayOnly = historyPastThreeDays.head(2)
+        else:
+            historyTodayAndPreviousDayOnly = stockHistoryPastWeek.tail(2)
 
         dateOfInterestAccordingToHistoricalData = historyTodayAndPreviousDayOnly.index[-1][1]  # this gives a datetime date, not a datetime object
         # actualTickerRegMarketTimeDate does not equal datetime.now('US/Eastern').date(). It simply equals the regular market time. The timezone of the time is timezone of os at time of starting python program
@@ -211,6 +241,25 @@ def getStockData(stockSymbolList, date, listOfAllQuarterDates=[]):#date is kind 
             closePricesMarch2020 = stockHistoryMarch2020.loc[:, 'close'].to_numpy()
             marchLowClosePrice = min(closePricesMarch2020)
             stock.sortingValue = (stock.closePrice - marchLowClosePrice)/marchLowClosePrice
+
+
+
+        price, priceExistsNumYearsAgo = getMeanPriceYearsAgo(5, date, yahooQueryStock)
+        if (priceExistsNumYearsAgo == True):
+            stock.meanPriceForMonthFiveYearsAgo = price
+        else:
+            stock.closePriceMaxAgo = price
+
+        price, priceExistsNumYearsAgo = getMeanPriceYearsAgo(10, date, yahooQueryStock)
+        if (priceExistsNumYearsAgo == True):
+            stock.meanPriceForMonthTenYearsAgo = price
+        else:
+            stock.closePriceMaxAgo = price
+
+
+
+
+
 
 
         listOfStockData.append(stock)

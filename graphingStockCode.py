@@ -53,7 +53,7 @@ def saveFiguresAsMultiPagePDF(figures, startDate, endDate, subPlotNrows, subPlot
 
 
 
-def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData, graphEndDate, graphStartDate = None):
+def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData, graphEndDate, userOptions, graphStartDate = None):
     if graphStartDate == None:
         graphStartDate = graphEndDate - timedelta(weeks=52)#default graph is a 1 year graph
 
@@ -92,8 +92,8 @@ def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData,
     wspace = 0.2  # the amount of width reserved for blank space between subplots
     hspace = 0.2  # the amount of height reserved for white space between subplots
     '''
-    subPlotNrows = 10
-    subPlotNcols = 10
+    subPlotNrows = userOptions['numRowsForGraphs']
+    subPlotNcols = userOptions['numColsForGraphs']
     annotationTextXShift = timedelta(days=5*subPlotNcols)#days=25 works well for 5x5 plot
     #pyplot.tight_layout()#sets tight layout for all figures or does it? doesn't work?
     figSize = ((11/(8.5/11))*2, 11*2)#width, height in inches
@@ -126,6 +126,13 @@ def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData,
         data_indexTuples = list(data.index.values)
         data_datesList = [i[1] for i in data_indexTuples]
         closePricesDataFrame = pd.DataFrame(data_closePrices, index=data_datesList, columns=['close'])
+        #
+        #
+        #
+        #I think I need to add '0' data points if stock doesn't go back to the desired time frame so that x axis is same for all the graphs.
+        #
+        #
+        #
 
 
         movingAvg_14day = closePricesDataFrame.rolling(window=14).mean()
@@ -219,6 +226,8 @@ def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData,
         # Ensure a major tick for desired interval
         ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=4))#mdates.WeekdayLocator(interval=2) means 2 weeks
         pyplot.setp(ax.get_xticklabels(), rotation='horizontal', position=(0,0.035))#position moves x tick labels in x and y dimension, rotation can be a number in degrees
+        ax.set_ylim(ymin=0)
+
         #update master handle and label lists, only add ones that don't exist
         handles, labels = ax.get_legend_handles_labels()
         for handle in handles:
@@ -227,6 +236,8 @@ def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData,
         for label in labels:
             if label not in masterFigLegendLabels:
                 masterFigLegendLabels.append(label)
+
+
 
 
         stockIterator += 1
@@ -258,8 +269,13 @@ def graphStockDataAndReturnStockDataUpdatedWithIntersectionData(listofStockData,
     for fig in listOfFigures:
         fig.legend(masterFigLegendHandles, masterFigLegendLabels, loc='upper right', ncol = len(masterFigLegendHandles), labelspacing=0)
 
-    #pyplot.show()
-    graphPdfFilename = saveFiguresAsMultiPagePDF(listOfFigures,graphStartDate,graphEndDate,subPlotNrows,subPlotNcols)
+    if userOptions['showGraphs']:
+        pyplot.show()
+
+    graphPdfFilename = 'No graph pdf saved'
+    if userOptions['saveGraphs']:
+        graphPdfFilename = saveFiguresAsMultiPagePDF(listOfFigures,graphStartDate,graphEndDate,subPlotNrows,subPlotNcols)
+
     for fig in listOfFigures:
         pyplot.close(fig)
     pyplot.close('all')  # sometimes a blank figure 1 window is left over, why? Google this. Maybe this will fix it
