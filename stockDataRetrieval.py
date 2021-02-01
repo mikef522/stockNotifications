@@ -1,7 +1,6 @@
 from datetime import datetime
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
-from pytz import timezone
 from yahooquery import Ticker
 import yahooquery
 import pandas as pd

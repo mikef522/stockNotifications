@@ -1,29 +1,13 @@
 import datetime
-import yfinance as yf
-
-import pandas_datareader as pdr
-
 import pandas as pd
-import smtplib
-
-import schedule
-import time
-
 from datetime import datetime
-from datetime import timedelta
 from pytz import timezone
-
 import math
-
-
 from stockDataRetrieval import getStockData
-
-
 import numpy
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
-
 from graphingStockCode import graphStockDataAndReturnStockDataUpdatedWithIntersectionData
 
 
@@ -308,8 +292,7 @@ def analyzeAndOutputStockData(stockSymbolList,dateOfInterest, userOptions):
 
         #format data columns before quarterly data
         #sht1.column_dimensions['A'].number_format = '[Color10]+0.00\%;[Red]-0.0#\%'#sorting value, change % from march lows in this case
-        ['Max ago change %', '10yr(uses 1mo avg) change %', '5yr(uses 1mo avg) change %', 'March low change(%)', 'Stock',
-         'Price', 'Change($)', 'Change(%)', 'PE Ratio']
+
 
         ##
         ##Replace this set of code with a function

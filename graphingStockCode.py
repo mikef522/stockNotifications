@@ -1,7 +1,6 @@
 from typing import List, Any
 
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as pyplot
 import matplotlib.dates as mdates
 #%matplotlib inline
@@ -11,7 +10,6 @@ from datetime import timedelta
 from datetime import datetime
 import numpy
 from yahooquery import Ticker
-import yahooquery
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.patheffects as pe
 
