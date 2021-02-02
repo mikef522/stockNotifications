@@ -100,38 +100,3 @@ def performStockAnalysis(userOptions):
 
     changeSystemTimeToPacificStandardTime()
 
-
-
-
-##start of Program
-stockSymbolList = ['xpev']
-datesOfInterest = [datetime(2021,1,29)]
-willEmailStockData = False
-emailRecipients = ['mikef522@gmail.com']
-
-notificationsEmailAddress = 'stocknotificationsmike@gmail.com'
-notificationsEmailPassword = 'mikef_522'
-
-userOptions = {
-    'stockSymbolList': [],
-    'datesOfInterest': [],
-    'willEmailStockData': False,
-    'emailRecipients': [],
-    'numRowsForGraphs': 4,
-    'numColsForGraphs': 4,
-    'showGraphs': False,
-    'saveGraphs': True,
-    'saveExcel': True,
-    'notificationEmailAddress': 'No notification email address specified',
-    'notificationEmailPassword': 'No notification email password specified'
-}
-
-userOptions['stockSymbolList'] = stockSymbolList
-userOptions['datesOfInterest'] = datesOfInterest
-userOptions['willEmailStockData'] = willEmailStockData
-userOptions['emailRecipients'] = emailRecipients
-
-userOptions['notificationEmailAddress'] = notificationsEmailAddress
-userOptions['notificationEmailPassword'] = notificationsEmailPassword
-
-performStockAnalysis(userOptions)
